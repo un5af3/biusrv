@@ -90,6 +90,14 @@ commands = [                 # Custom commands to run
     "timedatectl set-timezone Asia/Shanghai"
 ]
 
+# Target server for initialization
+[init.server.target_server]
+host = "192.168.1.100"       # Server to initialize
+port = 22                     # SSH port (default: 22)
+username = "root"             # SSH username
+password = "initial-password" # Initial password for root
+# keypath = "~/.ssh/id_rsa"   # Optional: SSH key path
+
 # SSH server configuration
 [init.sshd]
 new_port = 2222              # Optional, change SSH port
@@ -253,6 +261,14 @@ commands = [                     # Custom commands to run after setup
     "echo 'Welcome!' > /etc/motd",
     "timedatectl set-timezone UTC"
 ]
+
+# Target server for initialization
+[init.server.target_server]
+host = "192.168.1.100"          # Server to initialize
+port = 22                        # SSH port (default: 22)
+username = "root"                # SSH username
+password = "initial-password"    # Initial password for root
+# keypath = "~/.ssh/id_rsa"      # Optional: SSH key path
 
 # SSH server configuration
 [init.sshd]
