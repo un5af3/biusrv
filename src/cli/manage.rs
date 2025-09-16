@@ -13,7 +13,6 @@ use crate::{
         common,
         executor::{self, Task},
     },
-    component::manager::ComponentManager,
     config::ManageConfig,
 };
 
@@ -52,11 +51,7 @@ pub enum ManageAction {
 }
 
 impl ManageCommand {
-    pub async fn execute(
-        &self,
-        config: &ManageConfig,
-        component_manager: ComponentManager,
-    ) -> Result<()> {
+    pub async fn execute(&self, config: &ManageConfig) -> Result<()> {
         let srv_config = config
             .server
             .as_ref()
@@ -76,7 +71,7 @@ impl ManageCommand {
 
         // execute actions that don't need server
         if match action {
-            ManageAction::Component(action) => action.local_execute(&component_manager)?,
+            ManageAction::Component(action) => action.local_execute()?,
             ManageAction::Exec(action) => action.local_execute()?,
             ManageAction::Firewall(action) => action.local_execute()?,
             ManageAction::Transfer(action) => action.local_execute()?,
@@ -117,7 +112,7 @@ impl ManageCommand {
         match action {
             ManageAction::Component(component_action) => {
                 component_action
-                    .remote_execute(thread_num, self.max_retry, tasks, component_manager)
+                    .remote_execute(thread_num, self.max_retry, tasks)
                     .await
             }
             ManageAction::Exec(exec_action) => {

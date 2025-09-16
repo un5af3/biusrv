@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use clap::Args;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use crate::{
     cli::executor::{self, Task},
@@ -8,8 +8,13 @@ use crate::{
     ssh::Client,
 };
 
+static COMPONENT_MANAGER: OnceLock<ComponentManager> = OnceLock::new();
+
 #[derive(Args, Clone, Debug)]
 pub struct ComponentAction {
+    /// Component directory path
+    #[arg(short = 'D', long, default_value = "components")]
+    pub dir: String,
     /// List all components
     #[arg(short, long)]
     pub list: bool,
@@ -22,19 +27,23 @@ pub struct ComponentAction {
 }
 
 impl ComponentAction {
-    pub fn local_execute(&self, component_manager: &ComponentManager) -> Result<bool> {
+    pub fn local_execute(&self) -> Result<bool> {
+        let component_manager = ComponentManager::build(&self.dir)?;
+        COMPONENT_MANAGER.set(component_manager).unwrap();
+        let manager = COMPONENT_MANAGER.get().unwrap();
+
         if self.list {
-            list_components(component_manager);
+            list_components(manager);
             return Ok(true);
         } else if !self.install.is_empty() {
-            if !check_components(&self.install, component_manager) {
+            if !check_components(&self.install, manager) {
                 return Err(anyhow!(
                     "Supported component '{}' not found",
                     self.install.join(", ")
                 ));
             }
         } else if !self.uninstall.is_empty() {
-            if !check_components(&self.uninstall, component_manager) {
+            if !check_components(&self.uninstall, manager) {
                 return Err(anyhow!(
                     "Supported component '{}' not found",
                     self.uninstall.join(", ")
@@ -54,14 +63,13 @@ impl ComponentAction {
         thread_num: usize,
         max_retry: u32,
         tasks: Vec<Task>,
-        manager: ComponentManager,
     ) -> Result<()> {
         let action = Arc::new(self.clone());
-        let manager = Arc::new(manager);
+        let manager = COMPONENT_MANAGER.get().unwrap();
 
         executor::execute_tasks(thread_num, max_retry, tasks, move |_, task| {
             let action = Arc::clone(&action);
-            let manager = Arc::clone(&manager);
+            //let manager = Arc::clone(&manager);
             handle_component_execute(action, task, manager)
         })
         .await
@@ -71,24 +79,12 @@ impl ComponentAction {
 pub async fn handle_component_execute(
     action: Arc<ComponentAction>,
     task: Arc<Task>,
-    manager: Arc<ComponentManager>,
+    manager: &ComponentManager,
 ) -> Result<()> {
     let result = if !action.install.is_empty() {
-        install_component(
-            &task.srv_name,
-            &task.ssh_client,
-            &action.install,
-            manager.clone(),
-        )
-        .await
+        install_component(&task.srv_name, &task.ssh_client, &action.install, manager).await
     } else if !action.uninstall.is_empty() {
-        uninstall_component(
-            &task.srv_name,
-            &task.ssh_client,
-            &action.uninstall,
-            manager.clone(),
-        )
-        .await
+        uninstall_component(&task.srv_name, &task.ssh_client, &action.uninstall, manager).await
     } else {
         unreachable!()
     };
@@ -134,7 +130,7 @@ pub async fn install_component<S: AsRef<str>>(
     srv_name: &str,
     ssh_client: &Client,
     comp_names: &[S],
-    comp_manager: Arc<ComponentManager>,
+    comp_manager: &ComponentManager,
 ) -> Result<()> {
     let session = match ssh_client.connect().await {
         Ok(session) => session,
@@ -162,7 +158,7 @@ pub async fn uninstall_component<S: AsRef<str>>(
     srv_name: &str,
     ssh_client: &Client,
     comp_names: &[S],
-    comp_manager: Arc<ComponentManager>,
+    comp_manager: &ComponentManager,
 ) -> Result<()> {
     let session = match ssh_client.connect().await {
         Ok(session) => session,

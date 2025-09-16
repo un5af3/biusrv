@@ -58,7 +58,7 @@ Create a `config.toml` file:
 host = "192.168.1.100"
 port = 22                    # Optional, defaults to 22
 username = "root"
-keypath = "~/.ssh/id_rsa"    # Optional, for key-based auth
+keypath = "/home/user/.ssh/id_rsa"    # Optional, for key-based auth
 password = "your-password"   # Optional, for password auth
 use_password = false         # Optional, defaults to false
 
@@ -66,14 +66,14 @@ use_password = false         # Optional, defaults to false
 host = "your-vps.com"
 port = 2222                  # Custom SSH port
 username = "admin"
-keypath = "~/.ssh/vps_key"   # SSH key path
+keypath = "/home/user/.ssh/vps_key"   # SSH key path
 # password = "secret"        # Uncomment for password auth
 # use_password = true        # Uncomment to enable password auth
 
 [manage.server.production]
 host = "prod.example.com"
 username = "deploy"
-keypath = "~/.ssh/prod_key"
+keypath = "/home/user/.ssh/prod_key"
 port = 22
 
 # ===========================================
@@ -96,7 +96,7 @@ host = "192.168.1.100"       # Server to initialize
 port = 22                     # SSH port (default: 22)
 username = "root"             # SSH username
 password = "initial-password" # Initial password for root
-# keypath = "~/.ssh/id_rsa"   # Optional: SSH key path
+# keypath = "/home/user/.ssh/id_rsa"   # Optional: SSH key path
 
 # SSH server configuration
 [init.sshd]
@@ -238,7 +238,7 @@ biusrv manage --server pi firewall --delete-allow-port 8080
 host = "server-ip-or-domain"     # Required: Server hostname or IP
 username = "ssh-username"        # Required: SSH username
 port = 22                        # Optional: SSH port (default: 22)
-keypath = "~/.ssh/id_rsa"        # Optional: Path to SSH private key
+keypath = "/home/user/.ssh/id_rsa"        # Optional: Path to SSH private key
 password = "ssh-password"        # Optional: SSH password
 use_password = false             # Optional: Use password auth (default: false)
 ```
@@ -268,7 +268,7 @@ host = "192.168.1.100"          # Server to initialize
 port = 22                        # SSH port (default: 22)
 username = "root"                # SSH username
 password = "initial-password"    # Initial password for root
-# keypath = "~/.ssh/id_rsa"      # Optional: SSH key path
+# keypath = "/home/user/.ssh/id_rsa"      # Optional: SSH key path
 
 # SSH server configuration
 [init.sshd]

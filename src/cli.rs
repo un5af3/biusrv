@@ -31,10 +31,6 @@ pub struct Cli {
     #[arg(long, default_value = "info")]
     pub log_level: String,
 
-    /// Component directory path
-    #[arg(short = 'D', long = "comp-dir", default_value = "components")]
-    pub component_path: String,
-
     #[command(subcommand)]
     pub command: Commands,
 }

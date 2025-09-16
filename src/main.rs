@@ -4,7 +4,6 @@ use clap::Parser;
 use log::{error, LevelFilter};
 
 use biusrv::cli::{Cli, Commands};
-use biusrv::component::manager::ComponentManager;
 use biusrv::config::Config;
 
 #[tokio::main]
@@ -24,18 +23,6 @@ async fn main() {
         }
     };
 
-    // Parse component manager
-    let component_manager = match ComponentManager::build(&cli.component_path) {
-        Ok(manager) => manager,
-        Err(e) => {
-            error!(
-                "Failed to load components from '{}': {}",
-                cli.component_path, e
-            );
-            std::process::exit(1);
-        }
-    };
-
     match cli.command {
         Commands::Init(init_cmd) => {
             if let Some(init_config) = &config.init {
@@ -50,7 +37,7 @@ async fn main() {
         }
         Commands::Manage(manage_cmd) => {
             if let Some(manage_config) = &config.manage {
-                if let Err(e) = manage_cmd.execute(manage_config, component_manager).await {
+                if let Err(e) = manage_cmd.execute(manage_config).await {
                     error!("Manage command failed: {}", e);
                     std::process::exit(1);
                 }
