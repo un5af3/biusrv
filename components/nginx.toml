@@ -1,0 +1,19 @@
+[info]
+name = "nginx"
+description = "Web server"
+
+[service]
+start = true
+enable = true
+
+[check]
+command = "which nginx"
+
+[install]
+type = "package"
+packages = ["nginx"]
+after = [ "which nginx" ]
+
+[uninstall]
+type = "package"
+packages = ["nginx", "nginx-common"]
