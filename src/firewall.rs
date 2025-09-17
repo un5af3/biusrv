@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 
 use crate::ssh::Session;
-use crate::utils;
+use crate::utils::{self, truncate_error_message};
 
 /// Install and setup ufw
 pub async fn setup(session: &Session) -> Result<()> {
@@ -33,7 +33,12 @@ pub async fn allow_port(session: &Session, port_spec: &str) -> Result<()> {
         .execute_with_sudo(&format!("ufw status | grep '{}.*ALLOW'", port_spec))
         .await?;
     if verify_result.exit_status != 0 {
-        return Err(anyhow!("Port {} was not allowed successfully", port_spec));
+        return Err(anyhow!(
+            "Port {} was not allowed successfully (exit code: {}) - {}",
+            port_spec,
+            verify_result.exit_status,
+            truncate_error_message(&verify_result.output.trim(), 3)
+        ));
     }
 
     Ok(())
@@ -49,7 +54,12 @@ pub async fn deny_port(session: &Session, port_spec: &str) -> Result<()> {
         .execute_with_sudo(&format!("ufw status | grep '{}.*DENY'", port_spec))
         .await?;
     if verify_result.exit_status != 0 {
-        return Err(anyhow!("Port {} was not denied successfully", port_spec));
+        return Err(anyhow!(
+            "Port {} was not denied successfully (exit code: {}) - {}",
+            port_spec,
+            verify_result.exit_status,
+            truncate_error_message(&verify_result.output.trim(), 3)
+        ));
     }
 
     Ok(())
@@ -59,7 +69,11 @@ pub async fn deny_port(session: &Session, port_spec: &str) -> Result<()> {
 pub async fn status(session: &Session) -> Result<String> {
     let result = session.execute_with_sudo("ufw status").await?;
     if result.exit_status != 0 {
-        return Err(anyhow!("Failed to get ufw status"));
+        return Err(anyhow!(
+            "Failed to get ufw status (exit code: {}) - {}",
+            result.exit_status,
+            truncate_error_message(&result.output.trim(), 3)
+        ));
     }
     Ok(result.output)
 }
@@ -135,7 +149,11 @@ pub async fn list_allowed_ports(session: &Session) -> Result<Vec<String>> {
     let result = session.execute_with_sudo("ufw status").await?;
 
     if result.exit_status != 0 {
-        return Err(anyhow!("Failed to list ports"));
+        return Err(anyhow!(
+            "Failed to list allowed ports (exit code: {}) - {}",
+            result.exit_status,
+            truncate_error_message(&result.output.trim(), 3)
+        ));
     }
 
     // Parse ufw status output to extract only ALLOW port rules
@@ -159,7 +177,11 @@ pub async fn list_denied_ports(session: &Session) -> Result<Vec<String>> {
     let result = session.execute_with_sudo("ufw status").await?;
 
     if result.exit_status != 0 {
-        return Err(anyhow!("Failed to list ports"));
+        return Err(anyhow!(
+            "Failed to list denied ports (exit code: {}) - {}",
+            result.exit_status,
+            truncate_error_message(&result.output.trim(), 3)
+        ));
     }
 
     // Parse ufw status output to extract only DENY port rules

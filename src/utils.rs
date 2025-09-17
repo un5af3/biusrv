@@ -1,6 +1,21 @@
 use crate::ssh::{CommandResult, Session};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use base64::{engine::general_purpose, Engine as _};
+
+/// Truncate error message to a reasonable number of lines for display
+pub fn truncate_error_message(message: &str, max_lines: usize) -> String {
+    let lines: Vec<&str> = message.lines().collect();
+    if lines.len() <= max_lines {
+        message.to_string()
+    } else {
+        let truncated_lines = &lines[..max_lines];
+        format!(
+            "{}\n... (truncated {} more lines)",
+            truncated_lines.join("\n"),
+            lines.len() - max_lines
+        )
+    }
+}
 
 pub async fn install(session: &Session, package: &str) -> Result<CommandResult> {
     let command = format!("apt install -y {}", package);
@@ -67,6 +82,14 @@ pub async fn enable_service(session: &Session, service: &str) -> Result<CommandR
         result = session
             .execute_with_sudo(&format!("update-rc.d {} defaults", service))
             .await?;
+        if result.exit_status != 0 {
+            return Err(anyhow!(
+                "Failed to enable service '{}' (exit code: {}) - {}",
+                service,
+                result.exit_status,
+                truncate_error_message(&result.output.trim(), 3)
+            ));
+        }
     }
     Ok(result)
 }

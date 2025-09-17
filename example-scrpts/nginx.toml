@@ -1,0 +1,65 @@
+[info]
+name = "nginx"
+desc = "Nginx web server installation and configuration"
+
+[script.install]
+desc = "Install Nginx web server"
+sudo = true
+commands = [
+    "apt update",
+    "apt install -y nginx",
+    "systemctl enable nginx",
+    "systemctl start nginx",
+    "nginx -v"
+]
+
+[script.configure]
+desc = "Configure Nginx with basic settings"
+sudo = true
+commands = [
+    "cp /etc/nginx/nginx.conf /etc/nginx/nginx.conf.backup",
+    "sed -i 's/# server_tokens off;/server_tokens off;/' /etc/nginx/nginx.conf",
+    "sed -i 's/# gzip on;/gzip on;/' /etc/nginx/nginx.conf",
+    "systemctl reload nginx"
+]
+
+[script.create-sample]
+desc = "Create a sample website"
+sudo = true
+commands = [
+    "mkdir -p /var/www/html",
+    "echo '<h1>Welcome to Nginx!</h1><p>Server is running successfully.</p>' > /var/www/html/index.html",
+    "chown -R www-data:www-data /var/www/html",
+    "chmod -R 755 /var/www/html"
+]
+
+[script.ssl-setup]
+desc = "Setup SSL with Let's Encrypt (requires domain)"
+sudo = true
+commands = [
+    "apt install -y certbot python3-certbot-nginx",
+    "echo 'Please run: certbot --nginx -d yourdomain.com'",
+    "echo 'SSL setup requires manual domain configuration'"
+]
+
+[script.uninstall]
+desc = "Uninstall Nginx completely"
+sudo = true
+commands = [
+    "systemctl stop nginx",
+    "systemctl disable nginx",
+    "apt remove -y nginx nginx-common",
+    "apt autoremove -y",
+    "rm -rf /etc/nginx",
+    "rm -rf /var/www/html"
+]
+
+[script.status]
+desc = "Check Nginx status and configuration"
+sudo = false
+commands = [
+    "systemctl status nginx",
+    "nginx -t",
+    "ss -tlnp | grep :80",
+    "ss -tlnp | grep :443"
+]

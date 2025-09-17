@@ -4,7 +4,7 @@ use anyhow::{anyhow, Result};
 
 use crate::config::{Fail2banConfig, Fail2banJailConfig};
 use crate::ssh::{CommandResult, Session};
-use crate::utils;
+use crate::utils::{self, truncate_error_message};
 
 /// Install and setup fail2ban
 pub async fn setup(session: &Session, backend: Option<&str>) -> Result<CommandResult> {
@@ -15,8 +15,13 @@ pub async fn setup(session: &Session, backend: Option<&str>) -> Result<CommandRe
     }
 
     let backend = backend.unwrap_or("systemd");
-    if set_backend(session, backend).await?.exit_status != 0 {
-        return Err(anyhow!("Fail2ban set backend failed"));
+    let backend_result = set_backend(session, backend).await?;
+    if backend_result.exit_status != 0 {
+        return Err(anyhow!(
+            "Fail2ban set backend failed (exit code: {}) - {}",
+            backend_result.exit_status,
+            truncate_error_message(&backend_result.output.trim(), 3)
+        ));
     }
 
     utils::enable_service(session, "fail2ban").await?;
@@ -53,7 +58,11 @@ pub async fn configure(session: &Session, config: &Fail2banConfig) -> Result<()>
     // Reload fail2ban to apply changes
     let result = reload(session).await?;
     if result.exit_status != 0 {
-        return Err(anyhow!("Fail2ban reload failed"));
+        return Err(anyhow!(
+            "Fail2ban reload failed (exit code: {}) - {}",
+            result.exit_status,
+            truncate_error_message(&result.output.trim(), 3)
+        ));
     }
 
     Ok(())
@@ -169,7 +178,13 @@ pub async fn ban_ip(session: &Session, jail_name: &str, ip: &str) -> Result<()> 
         ))
         .await?;
     if verify_result.exit_status != 0 {
-        return Err(anyhow!("IP {} was not banned in jail {}", ip, jail_name));
+        return Err(anyhow!(
+            "IP {} was not banned in jail {} (exit code: {}) - {}",
+            ip,
+            jail_name,
+            verify_result.exit_status,
+            truncate_error_message(&verify_result.output.trim(), 3)
+        ));
     }
 
     Ok(())

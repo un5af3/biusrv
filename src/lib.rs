@@ -19,8 +19,8 @@ pub mod utils;
 /// Fail2ban management functionality.
 pub mod fail2ban;
 
-/// Component management functionality.
-pub mod component;
+/// Script execution functionality.
+pub mod script;
 
 /// CLI interface and commands.
 pub mod cli;

@@ -1,0 +1,66 @@
+[info]
+name = "nodejs"
+desc = "Node.js runtime environment setup"
+
+[script.install-lts]
+desc = "Install Node.js LTS version"
+sudo = true
+commands = [
+    "curl -fsSL https://deb.nodesource.com/setup_lts.x | bash -",
+    "apt install -y nodejs",
+    "node --version",
+    "npm --version"
+]
+
+[script.install-current]
+desc = "Install Node.js current version"
+sudo = true
+commands = [
+    "curl -fsSL https://deb.nodesource.com/setup_current.x | bash -",
+    "apt install -y nodejs",
+    "node --version",
+    "npm --version"
+]
+
+[script.install-yarn]
+desc = "Install Yarn package manager"
+sudo = true
+commands = [
+    "npm install -g yarn",
+    "yarn --version"
+]
+
+[script.install-pm2]
+desc = "Install PM2 process manager"
+sudo = true
+commands = [
+    "npm install -g pm2",
+    "pm2 --version",
+    "pm2 startup",
+    "pm2 save"
+]
+
+[script.create-app]
+desc = "Create a sample Node.js application"
+sudo = true
+commands = [
+    "mkdir -p /opt/myapp",
+    "cd /opt/myapp",
+    "npm init -y",
+    "echo 'const express = require(\"express\"); const app = express(); app.get(\"/\", (req, res) => res.send(\"Hello World!\")); app.listen(3000, () => console.log(\"Server running on port 3000\"));' > app.js",
+    "npm install express",
+    "echo 'Sample Node.js app created in /opt/myapp'"
+]
+
+[script.uninstall]
+desc = "Uninstall Node.js and related packages"
+sudo = true
+commands = [
+    "apt remove -y nodejs npm",
+    "apt autoremove -y",
+    "rm -rf /usr/local/bin/npm",
+    "rm -rf /usr/local/bin/node",
+    "rm -rf /usr/local/lib/node_modules",
+    "rm -rf ~/.npm",
+    "rm -rf ~/.node-gyp"
+]

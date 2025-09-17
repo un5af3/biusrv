@@ -7,7 +7,7 @@ A powerful Rust-based SSH server management tool for initializing, managing, and
 ### 🎯 Core Functionality
 
 - **Server Initialization**: Automate user creation, SSH configuration, firewall setup, and fail2ban installation
-- **Component Management**: Install, uninstall, and manage server components (Docker, Node.js, etc.)
+- **Script Execution**: Execute predefined scripts for server setup and management
 - **Firewall Management**: Manage firewall rules with port allow/deny operations
 - **File Transfer**: Robust file upload/download with resume support and progress display
 - **Command Execution**: Execute commands on single or multiple servers concurrently
@@ -156,8 +156,8 @@ biusrv manage --list-servers
 # Execute commands on multiple servers
 biusrv manage --server pi,vps exec "systemctl status nginx"
 
-# Install components
-biusrv manage --server pi,vps component --install docker,nodejs
+# Execute scripts
+biusrv manage --server pi,vps script --action install,configure scripts/docker.toml
 
 # Transfer files
 biusrv manage --server pi transfer --upload ./app.tar.gz /opt/app.tar.gz
@@ -171,8 +171,8 @@ biusrv manage --server pi exec bash --shell
 ### Server Management
 
 ```bash
-# Manage all servers
-biusrv manage --all-servers component --install docker
+# Execute scripts on all servers
+biusrv manage --all-servers script --action install,configure scripts/nginx.toml
 
 # Manage specific servers
 biusrv manage --server web1,web2,db1 firewall --allow-port 3306,5432
@@ -200,17 +200,17 @@ biusrv manage --server pi transfer --upload ./config.conf /etc/app/ --force
 biusrv manage --server pi transfer --upload ./large-file.zip /tmp/ --hide-progress
 ```
 
-### Component Management
+### Script Management
 
 ```bash
-# List available components
-biusrv manage component --list
+# List available scripts
+biusrv manage script list scripts/docker.toml
 
-# Install multiple components
-biusrv manage --server pi component --install docker,nodejs,nginx
+# Execute specific script actions
+biusrv manage --server pi script --action install,configure scripts/nginx.toml
 
-# Uninstall components
-biusrv manage --server pi component --uninstall old-service
+# Execute all actions in a script
+biusrv manage --server pi script --action install,configure,ssl-setup scripts/nginx.toml
 ```
 
 ### Firewall Management
@@ -302,25 +302,48 @@ findtime = 600                   # Time window (seconds)
 bantime = 3600                   # Ban duration (seconds)
 ```
 
-### Component Configuration
+### Script Configuration
 
-Components are defined in TOML files in the `components/` directory:
+Scripts are defined in TOML files in the `scripts/` directory:
 
 ```toml
-# components/docker.toml
+# scripts/docker.toml
+[info]
 name = "docker"
-description = "Docker container runtime"
-install_commands = [
-    "curl -fsSL https://get.docker.com -o get-docker.sh",
-    "sh get-docker.sh",
+desc = "Docker container runtime"
+
+[script.install]
+desc = "Install Docker"
+sudo = true
+commands = [
+    "apt update",
+    "apt install -y docker.io",
     "systemctl enable docker",
     "systemctl start docker"
 ]
-uninstall_commands = [
+
+[script.uninstall]
+desc = "Uninstall Docker"
+sudo = true
+commands = [
     "systemctl stop docker",
-    "apt-get remove -y docker-ce docker-ce-cli containerd.io"
+    "apt remove -y docker.io",
+    "rm -rf /var/lib/docker"
 ]
 ```
+
+## 📚 Example Scripts
+
+The project includes comprehensive example scripts in the `example-scrpts/` directory:
+
+- **`nginx.toml`** - Nginx web server installation and configuration
+- **`nodejs.toml`** - Node.js runtime environment setup
+- **`redis.toml`** - Redis in-memory data store setup
+- **`monitoring.toml`** - System monitoring tools installation
+- **`security.toml`** - Security hardening and tools setup
+- **`backup.toml`** - Backup and restore utilities
+
+Each script includes multiple actions (install, configure, uninstall, etc.) and demonstrates best practices for server management automation.
 
 ## 🔧 Command Reference
 
@@ -358,15 +381,14 @@ Global Options:
 
 #### Subcommands:
 
-**Component Management:**
+**Script Management:**
 
 ```bash
-biusrv manage component [OPTIONS]
+biusrv manage script [OPTIONS]
 ```
 
-- `--list`: List all available components
-- `--install <COMPONENTS>`: Install components
-- `--uninstall <COMPONENTS>`: Uninstall components
+- `list <SCRIPT_FILE>`: List available actions in a script
+- `run <SCRIPT_FILE> --action <ACTIONS>`: Execute specific actions from a script
 
 **Command Execution:**
 
@@ -410,14 +432,14 @@ biusrv manage transfer [OPTIONS]
 src/
 ├── cli/                    # CLI interface
 │   ├── manage/            # Management subcommands
-│   │   ├── component.rs   # Component management
+│   │   ├── script.rs      # Script execution
 │   │   ├── exec.rs        # Command execution & shell
 │   │   ├── firewall.rs    # Firewall management
 │   │   └── transfer.rs    # File transfer
 │   ├── executor.rs        # Parallel task execution
 │   └── multishell.rs      # Multi-server shell sessions
-├── component/             # Component management
 ├── config.rs              # Configuration handling
+├── script.rs              # Script management
 ├── ssh.rs                 # SSH client implementation
 ├── transfer.rs            # File transfer core
 └── lib.rs                 # Library exports

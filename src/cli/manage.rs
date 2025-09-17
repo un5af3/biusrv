@@ -2,10 +2,10 @@
 use anyhow::{anyhow, Result};
 use clap::{Args, Subcommand};
 
-/// Manage action modules
-pub mod component;
 pub mod exec;
 pub mod firewall;
+/// Manage action modules
+pub mod script;
 pub mod transfer;
 
 use crate::{
@@ -40,8 +40,8 @@ pub struct ManageCommand {
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum ManageAction {
-    /// Manage components (install, uninstall, list)
-    Component(component::ComponentAction),
+    /// Execute scripts
+    Script(script::ScriptAction),
     /// Execute commands on remote servers
     Exec(exec::ExecAction),
     /// Manage firewall (allow, deny, status, delete)
@@ -64,14 +64,12 @@ impl ManageCommand {
         }
 
         let action = self.action.as_ref().ok_or_else(|| {
-            anyhow!(
-                "Please specify an action: use subcommands (component, exec, firewall, transfer)"
-            )
+            anyhow!("Please specify an action: use subcommands (script, exec, firewall, transfer)")
         })?;
 
         // execute actions that don't need server
         if match action {
-            ManageAction::Component(action) => action.local_execute()?,
+            ManageAction::Script(action) => action.local_execute()?,
             ManageAction::Exec(action) => action.local_execute()?,
             ManageAction::Firewall(action) => action.local_execute()?,
             ManageAction::Transfer(action) => action.local_execute()?,
@@ -110,8 +108,8 @@ impl ManageCommand {
         );
 
         match action {
-            ManageAction::Component(component_action) => {
-                component_action
+            ManageAction::Script(script_action) => {
+                script_action
                     .remote_execute(thread_num, self.max_retry, tasks)
                     .await
             }

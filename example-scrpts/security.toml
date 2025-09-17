@@ -1,0 +1,75 @@
+[info]
+name = "security"
+desc = "Security hardening and tools setup"
+
+[script.update-system]
+desc = "Update system packages for security"
+sudo = true
+commands = [
+    "apt update",
+    "apt upgrade -y",
+    "apt autoremove -y",
+    "apt autoclean"
+]
+
+[script.install-fail2ban]
+desc = "Install and configure fail2ban"
+sudo = true
+commands = [
+    "apt install -y fail2ban",
+    "systemctl enable fail2ban",
+    "systemctl start fail2ban",
+    "fail2ban-client status"
+]
+
+[script.configure-ssh]
+desc = "Harden SSH configuration"
+sudo = true
+commands = [
+    "cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup",
+    "sed -i 's/#PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config",
+    "sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config",
+    "sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config",
+    "echo 'Please review SSH config and restart SSH service manually'"
+]
+
+[script.install-ufw]
+desc = "Install and configure UFW firewall"
+sudo = true
+commands = [
+    "apt install -y ufw",
+    "ufw --force reset",
+    "ufw default deny incoming",
+    "ufw default allow outgoing",
+    "ufw allow ssh",
+    "ufw --force enable",
+    "ufw status"
+]
+
+[script.install-clamav]
+desc = "Install ClamAV antivirus"
+sudo = true
+commands = [
+    "apt install -y clamav clamav-daemon",
+    "systemctl enable clamav-daemon",
+    "systemctl start clamav-daemon",
+    "freshclam",
+    "clamdscan --version"
+]
+
+[script.scan-system]
+desc = "Scan system for malware"
+sudo = true
+commands = [
+    "clamdscan /home /var /opt",
+    "echo 'Scan completed. Check output above for any threats.'"
+]
+
+[script.audit-permissions]
+desc = "Audit file permissions"
+sudo = false
+commands = [
+    "find /home -type f -perm /o+w -ls",
+    "find /var -type f -perm /o+w -ls",
+    "find /etc -type f -perm /o+w -ls"
+]

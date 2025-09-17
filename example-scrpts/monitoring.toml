@@ -1,0 +1,70 @@
+[info]
+name = "monitoring"
+desc = "System monitoring tools setup"
+
+[script.install-htop]
+desc = "Install htop system monitor"
+sudo = true
+commands = [
+    "apt update",
+    "apt install -y htop",
+    "htop --version"
+]
+
+[script.install-iotop]
+desc = "Install iotop for I/O monitoring"
+sudo = true
+commands = [
+    "apt install -y iotop",
+    "iotop --version"
+]
+
+[script.install-netstat]
+desc = "Install network monitoring tools"
+sudo = true
+commands = [
+    "apt install -y net-tools",
+    "apt install -y ss",
+    "netstat --version",
+    "ss --version"
+]
+
+[script.system-info]
+desc = "Display system information"
+sudo = false
+commands = [
+    "uname -a",
+    "cat /etc/os-release",
+    "free -h",
+    "df -h",
+    "uptime"
+]
+
+[script.network-info]
+desc = "Display network information"
+sudo = false
+commands = [
+    "ip addr show",
+    "ip route show",
+    "ss -tlnp",
+    "netstat -tlnp"
+]
+
+[script.process-info]
+desc = "Display process information"
+sudo = false
+commands = [
+    "ps aux --sort=-%cpu | head -10",
+    "ps aux --sort=-%mem | head -10",
+    "top -bn1 | head -20"
+]
+
+[script.disk-info]
+desc = "Display disk usage information"
+sudo = false
+commands = [
+    "df -h",
+    "du -sh /var/log/*",
+    "du -sh /tmp/*",
+    "lsblk"
+]

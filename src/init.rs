@@ -4,7 +4,7 @@ use crate::config::{Fail2banConfig, FirewallConfig, InitConfig, SshdConfig};
 use crate::fail2ban;
 use crate::firewall;
 use crate::ssh::{CommandResult, Session};
-use crate::utils;
+use crate::utils::{self, truncate_error_message};
 
 #[derive(Debug)]
 pub struct InitServer {
@@ -89,7 +89,11 @@ impl InitServer {
         let verify_cmd = format!("id {}", self.new_username);
         let result = session.execute_with_sudo(&verify_cmd).await?;
         if result.exit_status != 0 {
-            return Err(anyhow!("User verification failed"));
+            return Err(anyhow!(
+                "User verification failed (exit code: {}) - {}",
+                result.exit_status,
+                truncate_error_message(&result.output.trim(), 3)
+            ));
         }
 
         let password_cmd = format!(
@@ -163,7 +167,11 @@ impl InitServer {
         );
         let result = session.execute_with_sudo(&verify_cmd).await?;
         if result.exit_status != 0 {
-            return Err(anyhow!("Sudo configuration verification failed"));
+            return Err(anyhow!(
+                "Sudo configuration verification failed (exit code: {}) - {}",
+                result.exit_status,
+                truncate_error_message(&result.output.trim(), 3)
+            ));
         }
 
         Ok(())
@@ -200,7 +208,11 @@ impl InitServer {
         if result.exit_status != 0 {
             result = session.execute_with_sudo("service ssh reload").await?;
             if result.exit_status != 0 {
-                return Err(anyhow!("Failed to reload sshd: {}", result.output));
+                return Err(anyhow!(
+                    "Failed to reload sshd (exit code: {}) - {}",
+                    result.exit_status,
+                    truncate_error_message(&result.output.trim(), 3)
+                ));
             }
         }
 
@@ -279,7 +291,12 @@ impl InitServer {
             let result = session.execute_with_sudo(&cmd).await?;
 
             if result.exit_status != 0 {
-                return Err(anyhow!("Failed to execute command: {}", cmd));
+                return Err(anyhow!(
+                    "Failed to execute command '{}' (exit code: {}) - {}",
+                    cmd,
+                    result.exit_status,
+                    truncate_error_message(&result.output.trim(), 3)
+                ));
             }
         }
 

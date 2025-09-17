@@ -6,8 +6,9 @@ use std::sync::Arc;
 use anyhow::{anyhow, Context, Result};
 use crossterm::terminal;
 use russh::{
-    client::{self, Config, Handle},
+    client::{self, Config, Handle, Msg},
     keys::{load_secret_key, ssh_key, PrivateKeyWithHashAlg},
+    Channel,
 };
 use russh_sftp::client::SftpSession;
 use tokio::{
@@ -137,41 +138,16 @@ impl Session {
         Ok(TransferSession::new(session, config.unwrap_or_default()))
     }
 
-    pub async fn execute_command_no_reply<S: AsRef<str>>(&self, command: S) -> Result<()> {
+    pub async fn open_internal_channel(&self) -> Result<Channel<Msg>> {
         let channel = self.handler.channel_open_session().await?;
-        channel.exec(false, command.as_ref()).await?;
-        Ok(())
+        Ok(channel)
     }
 
     pub async fn execute_command<S: AsRef<str>>(&self, command: S) -> Result<CommandResult> {
         let mut channel = self.handler.channel_open_session().await?;
         channel.exec(true, command.as_ref()).await?;
 
-        let mut result = CommandResult {
-            output: String::new(),
-            exit_status: 0,
-        };
-
-        while let Some(data) = channel.wait().await {
-            match data {
-                russh::ChannelMsg::Data { data } => {
-                    result.output.push_str(&String::from_utf8_lossy(&data));
-                }
-                russh::ChannelMsg::ExitStatus { exit_status } => {
-                    result.exit_status = exit_status;
-                    if exit_status != 0 {
-                        return Ok(result);
-                    }
-                }
-                russh::ChannelMsg::Close => break,
-                _ => {}
-            }
-        }
-
-        // Remove trailing newlines before returning
-        if result.output.ends_with("\n") {
-            result.output.pop();
-        }
+        let result = wait_result_from_channel(&mut channel).await?;
         Ok(result)
     }
 
@@ -183,20 +159,6 @@ impl Session {
 
         for command in commands {
             results.push(self.execute_command(command.as_ref()).await);
-        }
-
-        Ok(results)
-    }
-
-    pub async fn execute_commands_one_by_one<S: AsRef<str>>(
-        &self,
-        commands: &[S],
-    ) -> Result<Vec<CommandResult>> {
-        let mut results = Vec::new();
-
-        for command in commands {
-            let result = self.execute_command(command.as_ref()).await?;
-            results.push(result);
         }
 
         Ok(results)
@@ -268,6 +230,12 @@ impl Session {
                             output.write_all(&data).await?;
                             output.flush().await?;
                         }
+                        russh::ChannelMsg::ExtendedData { data, ext } => {
+                            if ext == 1 {
+                                output.write_all(&data).await?;
+                                output.flush().await?;
+                            }
+                        }
                         russh::ChannelMsg::ExitStatus { exit_status } => {
                             code = exit_status;
                             if !stdin_closed {
@@ -328,6 +296,11 @@ impl Session {
                         russh::ChannelMsg::Data { data } => {
                             tx.send(data.to_vec()).await?;
                         }
+                        russh::ChannelMsg::ExtendedData { data, ext } => {
+                            if ext == 1 {
+                                tx.send(data.to_vec()).await?;
+                            }
+                        }
                         russh::ChannelMsg::ExitStatus { exit_status } => {
                             code = exit_status;
                             if !input_closed {
@@ -343,6 +316,39 @@ impl Session {
 
         Ok(code)
     }
+}
+
+pub async fn wait_result_from_channel(channel: &mut Channel<Msg>) -> Result<CommandResult> {
+    let mut result = CommandResult {
+        output: String::new(),
+        exit_status: 0,
+    };
+
+    while let Some(data) = channel.wait().await {
+        match data {
+            russh::ChannelMsg::Data { data } => {
+                result.output.push_str(&String::from_utf8_lossy(&data));
+            }
+            russh::ChannelMsg::ExtendedData { data, ext } => {
+                if ext == 1 {
+                    result.output.push_str(&String::from_utf8_lossy(&data));
+                }
+            }
+            russh::ChannelMsg::ExitStatus { exit_status } => {
+                result.exit_status = exit_status;
+                break;
+            }
+            russh::ChannelMsg::Close => break,
+            _ => {}
+        }
+    }
+
+    // Remove trailing newlines before returning
+    if result.output.ends_with("\n") {
+        result.output.pop();
+    }
+
+    Ok(result)
 }
 
 #[derive(Debug)]
