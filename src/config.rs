@@ -47,8 +47,24 @@ pub struct Config {
 
 impl Config {
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let path = path.as_ref();
         let contents = fs::read_to_string(path)?;
-        let config = toml::from_str(&contents)?;
+
+        if let Some(ext) = path.extension() {
+            if ext == "toml" {
+                let config = toml::from_str(&contents)?;
+                return Ok(config);
+            } else if ext == "yaml" {
+                let config = serde_yaml::from_str(&contents)?;
+                return Ok(config);
+            }
+        }
+
+        let config = if let Ok(config) = toml::from_str(&contents) {
+            config
+        } else {
+            serde_yaml::from_str(&contents)?
+        };
 
         Ok(config)
     }
@@ -128,12 +144,6 @@ pub struct ManageConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct FirewallConfig {
-    pub allow_ports: Vec<String>,
-    pub deny_ports: Option<Vec<String>>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SshdConfig {
     pub new_port: Option<u16>,
     pub public_key: Option<String>,
@@ -160,4 +170,20 @@ pub struct Fail2banJailConfig {
     pub logpath: Option<String>,
     pub ignoreip: Option<Vec<String>>,
     pub options: Option<HashMap<String, String>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FirewallConfig {
+    pub policy: FirewallPolicy,
+    pub enable_icmp: bool,
+    pub allow_ping: Option<bool>,
+    pub allow_ports: Option<Vec<String>>,
+    pub deny_ports: Option<Vec<String>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "lowercase")]
+pub enum FirewallPolicy {
+    Whitelist,
+    Blacklist,
 }

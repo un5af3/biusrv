@@ -1,0 +1,73 @@
+[info]
+name = "nginx"
+desc = "Web server and reverse proxy"
+
+[script.install]
+desc = "Install and configure nginx"
+
+[[script.install.step]]
+type = "command"
+sudo = true
+cmds = [
+    "apt update",
+    "apt install -y nginx",
+    "systemctl enable nginx"
+]
+
+[[script.install.step]]
+type = "upload"
+local = "./configs/nginx.conf"
+remote = "/etc/nginx/nginx.conf"
+force = true
+
+[[script.install.step]]
+type = "upload"
+local = "./sites/"
+remote = "/etc/nginx/sites-available/"
+force = true
+
+[[script.install.step]]
+type = "command"
+sudo = true
+cmds = [
+    "chmod 644 /etc/nginx/nginx.conf",
+    "chmod 755 /etc/nginx/sites-available/",
+    "systemctl start nginx"
+]
+
+[script.uninstall]
+desc = "Uninstall nginx"
+
+[[script.uninstall.step]]
+type = "command"
+sudo = true
+cmds = [
+    "systemctl stop nginx",
+    "systemctl disable nginx",
+    "apt-get purge -y nginx nginx-common",
+    "apt-get autoremove -y"
+]
+
+[[script.uninstall.step]]
+type = "command"
+sudo = true
+cmds = [
+    "rm -rf /etc/nginx",
+    "rm -rf /var/log/nginx",
+    "rm -rf /var/www/html"
+]
+
+[script.backup]
+desc = "Backup nginx configuration and logs"
+
+[[script.backup.step]]
+type = "download"
+local = "./backups/nginx-config/"
+remote = "/etc/nginx/"
+resume = true
+
+[[script.backup.step]]
+type = "download"
+local = "./backups/nginx-logs/"
+remote = "/var/log/nginx/"
+resume = true

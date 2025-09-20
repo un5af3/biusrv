@@ -16,9 +16,9 @@ Thumbs.db
 # Logs
 *.log
 
-# Config files (contains sensitive data)
-config.toml
-
 # Temporary files
 *.tmp
 *.temp
+
+# hide my private files
+real/

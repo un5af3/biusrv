@@ -7,7 +7,7 @@ use crate::ssh::{CommandResult, Session};
 use crate::utils::{self, truncate_error_message};
 
 /// Install and setup fail2ban
-pub async fn setup(session: &Session, backend: Option<&str>) -> Result<CommandResult> {
+pub async fn setup(session: &Session, backend: Option<&str>) -> Result<()> {
     // Check if fail2ban is installed
     let check_result = session.execute_with_sudo("which fail2ban-client").await?;
     if check_result.exit_status != 0 {
@@ -28,10 +28,17 @@ pub async fn setup(session: &Session, backend: Option<&str>) -> Result<CommandRe
 
     let status_result = utils::service_status(session, "fail2ban").await?;
     if status_result.exit_status != 0 {
-        utils::start_service(session, "fail2ban").await?;
+        let start_result = utils::start_service(session, "fail2ban").await?;
+        if start_result.exit_status != 0 {
+            return Err(anyhow!(
+                "Fail2ban start failed (exit code: {}) - {}",
+                start_result.exit_status,
+                truncate_error_message(&start_result.output.trim(), 3)
+            ));
+        }
     }
 
-    Ok(status_result)
+    Ok(())
 }
 
 pub async fn set_backend(session: &Session, backend: &str) -> Result<CommandResult> {

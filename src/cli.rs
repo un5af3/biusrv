@@ -24,11 +24,11 @@ use clap::{Parser, Subcommand};
 )]
 pub struct Cli {
     /// Config file
-    #[arg(short, long, default_value = "config.toml")]
+    #[arg(short, long, default_value = "config.yaml")]
     pub config: String,
 
     /// Log level (trace, debug, info, warn, error)
-    #[arg(long, default_value = "info")]
+    #[arg(long, default_value = "warn")]
     pub log_level: String,
 
     #[command(subcommand)]

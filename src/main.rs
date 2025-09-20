@@ -12,7 +12,7 @@ async fn main() {
 
     // init logger
     env_logger::Builder::from_default_env()
-        .filter_level(LevelFilter::from_str(&cli.log_level).unwrap_or(LevelFilter::Info))
+        .filter_level(LevelFilter::from_str(&cli.log_level).unwrap_or(LevelFilter::Warn))
         .init();
 
     let config = match Config::load(cli.config) {

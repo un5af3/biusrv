@@ -92,23 +92,89 @@ impl InitCommand {
 async fn handle_server(init_server: Arc<InitServer>, task: Arc<Task>) -> Result<()> {
     println!("🔧 Initializing: {}", task.srv_name);
 
-    let session = match task.ssh_client.connect().await {
-        Ok(session) => session,
-        Err(e) => {
-            log::error!(
-                "Failed to connect to {}({})",
-                task.srv_name,
-                task.ssh_client
-            );
-            return Err(e);
-        }
-    };
-
-    if let Err(e) = init_server.run(&session).await {
+    if let Err(e) = run_init(&init_server, &task).await {
         println!("❌ {} ({}) - Failed: {}", task.srv_name, task.ssh_client, e);
     } else {
         println!("✅ {} ({}) - Success", task.srv_name, task.ssh_client);
     }
+
+    Ok(())
+}
+
+pub async fn run_init(init_server: &InitServer, task: &Task) -> Result<()> {
+    let session = task.ssh_client.connect().await?;
+
+    println!(
+        "  📦 {} ({}) → Updating system packages",
+        task.srv_name, task.ssh_client
+    );
+    init_server.update_system(&session).await?;
+
+    println!(
+        "  📥 {} ({}) → Installing required packages",
+        task.srv_name, task.ssh_client
+    );
+    init_server.install_required(&session).await?;
+
+    println!(
+        "  👤 {} ({}) → Creating user account",
+        task.srv_name, task.ssh_client
+    );
+    init_server.create_user(&session).await?;
+
+    println!(
+        "  🔐 {} ({}) → Setting up sudo permissions",
+        task.srv_name, task.ssh_client
+    );
+    init_server.setup_sudo(&session).await?;
+
+    let mut ssh_port = 22;
+    if let Some(ref sshd_config) = init_server.sshd_config {
+        println!(
+            "  🔑 {} ({}) → Configuring SSH daemon",
+            task.srv_name, task.ssh_client
+        );
+        init_server.configure_sshd(&session, sshd_config).await?;
+        if let Some(port) = sshd_config.new_port {
+            ssh_port = port;
+        }
+    }
+
+    if let Some(ref fail2ban_config) = init_server.fail2ban_config {
+        println!(
+            "  🛡️ {} ({}) → Setting up Fail2ban protection",
+            task.srv_name, task.ssh_client
+        );
+        init_server
+            .setup_fail2ban(&session, fail2ban_config)
+            .await?;
+    }
+
+    if let Some(ref commands) = init_server.commands {
+        println!(
+            "  ⚡ {} ({}) → Executing custom commands",
+            task.srv_name, task.ssh_client
+        );
+        init_server
+            .execute_custom_commands(&session, commands)
+            .await?;
+    }
+
+    if let Some(ref firewall_config) = init_server.firewall_config {
+        println!(
+            "  🔥 {} ({}) → Configuring firewall",
+            task.srv_name, task.ssh_client
+        );
+        init_server
+            .setup_firewall(&session, ssh_port, firewall_config)
+            .await?;
+    }
+
+    println!(
+        "  🔄 {} ({}) → Reloading SSH daemon",
+        task.srv_name, task.ssh_client
+    );
+    init_server.reload_sshd(&session).await?;
 
     Ok(())
 }

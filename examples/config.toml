@@ -1,0 +1,77 @@
+# Main configuration file example (TOML format)
+# Used for server initialization and management
+
+[manage.server.web1]
+host = "192.168.1.100"
+port = 22
+username = "admin"
+keypath = "~/.ssh/id_rsa"
+
+[manage.server.web2]
+host = "192.168.1.101"
+port = 22
+username = "admin"
+keypath = "~/.ssh/id_rsa"
+
+[manage.server.db]
+host = "192.168.1.102"
+port = 22
+username = "admin"
+keypath = "~/.ssh/id_rsa"
+
+[init]
+new_username = "deploy"
+new_password = "secure_password_123"
+packages = ["bash", "curl", "git", "vim", "htop"]
+commands = [
+    "timedatectl set-timezone Asia/Shanghai",
+    "echo 'Welcome to server management' > /etc/motd"
+]
+
+[init.server.web1]
+host = "192.168.1.100"
+port = 22
+username = "root"
+password = "initial_password"
+
+[init.server.web2]
+host = "192.168.1.101"
+port = 22
+username = "root"
+password = "initial_password"
+
+[init.server.db]
+host = "192.168.1.102"
+port = 22
+username = "root"
+password = "initial_password"
+
+[init.sshd]
+new_port = 2222
+public_key = "ssh-rsa AAAAB....== admin@example.com"
+
+[init.sshd.options]
+PubkeyAuthentication = "yes"
+PermitRootLogin = "no"
+PasswordAuthentication = "no"
+PermitEmptyPasswords = "no"
+MaxAuthTries = "5"
+ClientAliveInterval = "300"
+X11Forwarding = "no"
+
+[init.firewall]
+policy = "whitelist"
+enable_icmp = false
+allow_ping = true
+allow_ports = ["2222/tcp", "80/tcp", "443/tcp", "3306/tcp"]
+
+[init.fail2ban]
+backend = "systemd"
+
+[init.fail2ban.jail.sshd]
+enabled = true
+port = "2222"
+filter = "sshd"
+maxretry = 3
+findtime = 600
+bantime = 3600

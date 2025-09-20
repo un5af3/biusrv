@@ -1,0 +1,68 @@
+[info]
+name = "mysql"
+desc = "Database server"
+
+[script.install]
+desc = "Install and configure MySQL"
+
+[[script.install.step]]
+type = "command"
+sudo = true
+cmds = [
+    "apt update",
+    "apt install -y mysql-server",
+    "systemctl enable mysql"
+]
+
+[[script.install.step]]
+type = "command"
+sudo = true
+cmds = [
+    "mysql_secure_installation <<EOF",
+    "n",
+    "password123",
+    "password123",
+    "y",
+    "y",
+    "y",
+    "y",
+    "EOF"
+]
+
+[[script.install.step]]
+type = "upload"
+local = "./configs/mysql.cnf"
+remote = "/etc/mysql/mysql.conf.d/mysqld.cnf"
+force = true
+
+[[script.install.step]]
+type = "command"
+sudo = true
+cmds = [
+    "systemctl restart mysql",
+    "systemctl status mysql"
+]
+
+[script.backup]
+desc = "Backup MySQL databases"
+
+[[script.backup.step]]
+type = "command"
+sudo: true
+cmds = [
+    "mkdir -p /tmp/mysql-backup",
+    "mysqldump --all-databases > /tmp/mysql-backup/all-databases.sql"
+]
+
+[[script.backup.step]]
+type = "download"
+local = "./backups/mysql/"
+remote = "/tmp/mysql-backup/"
+resume = true
+
+[[script.backup.step]]
+type = "command"
+sudo = true
+cmds = [
+    "rm -rf /tmp/mysql-backup"
+]

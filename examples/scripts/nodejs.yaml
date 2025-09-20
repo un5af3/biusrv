@@ -1,0 +1,47 @@
+info:
+  name: nodejs
+  desc: Node.js runtime environment
+
+script:
+  install:
+    desc: Install Node.js and npm
+    step:
+      - type: command
+        sudo: true
+        cmds:
+          - apt update
+          - apt install -y curl
+          - curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+          - apt install -y nodejs
+
+      - type: command
+        cmds:
+          - node --version
+          - npm --version
+          - npm install -g pm2
+
+  deploy:
+    desc: Deploy Node.js application
+    step:
+      - type: command
+        sudo: true
+        cmds:
+          - mkdir -p /opt/myapp
+          - chown -R deploy:deploy /opt/myapp
+
+      - type: upload
+        local: ./app/
+        remote: /opt/myapp/
+        force: true
+
+      - type: command
+        sudo: true
+        cmds:
+          - chown -R deploy:deploy /opt/myapp
+          - cd /opt/myapp && npm install
+
+      - type: command
+        cmds:
+          - cd /opt/myapp && pm2 start ecosystem.config.js
+          - pm2 save
+          - pm2 startup

@@ -1,0 +1,46 @@
+info:
+  name: monitoring
+  desc: System monitoring with Prometheus and Grafana
+
+script:
+  install:
+    desc: Install monitoring stack
+    step:
+      - type: command
+        sudo: true
+        cmds:
+          - apt update
+          - apt install -y wget curl
+
+      - type: command
+        sudo: true
+        cmds:
+          - wget https://github.com/prometheus/prometheus/releases/download/v2.40.0/prometheus-2.40.0.linux-amd64.tar.gz
+          - tar xzf prometheus-2.40.0.linux-amd64.tar.gz
+          - mv prometheus-2.40.0.linux-amd64 /opt/prometheus
+          - chown -R nobody:nogroup /opt/prometheus
+
+      - type: upload
+        local: ./configs/prometheus.yml
+        remote: /opt/prometheus/prometheus.yml
+        force: true
+
+      - type: command
+        sudo: true
+        cmds:
+          - chown nobody:nogroup /opt/prometheus/prometheus.yml
+          - systemctl enable prometheus
+          - systemctl start prometheus
+
+  backup:
+    desc: Backup monitoring data
+    step:
+      - type: download
+        local: ./backups/prometheus/
+        remote: /opt/prometheus/data/
+        resume: true
+
+      - type: download
+        local: ./backups/grafana/
+        remote: /var/lib/grafana/
+        resume: true

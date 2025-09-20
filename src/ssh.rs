@@ -98,8 +98,12 @@ impl Client {
             ));
         }
 
+        let channel = session.channel_open_session().await?;
+        let os_type = detect_os_type(channel).await?;
+
         Ok(Session {
             user: self.username.clone(),
+            os_type,
             handler: session,
         })
     }
@@ -119,12 +123,17 @@ pub struct CommandResult {
 
 pub struct Session {
     user: String,
+    os_type: OsType,
     handler: Handle<Handler>,
 }
 
 impl Session {
     pub fn current_user(&self) -> &str {
         &self.user
+    }
+
+    pub fn os_type(&self) -> OsType {
+        self.os_type
     }
 
     pub async fn open_sftp_session(
@@ -316,6 +325,76 @@ impl Session {
 
         Ok(code)
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OsType {
+    Debian,
+    RedHat,
+    Arch,
+}
+
+pub async fn detect_os_type(mut channel: Channel<Msg>) -> Result<OsType> {
+    let os_detect_command = r#"
+case "$(uname -s)" in
+    Linux)
+        if [ -f /etc/os-release ]; then
+            os_id=$(grep '^ID=' /etc/os-release | cut -d'=' -f2 | tr -d '"')
+            os_id_like=$(grep '^ID_LIKE=' /etc/os-release | cut -d'=' -f2 | tr -d '"')
+            if [ -n "$os_id_like" ]; then
+                echo "$os_id_like:$os_id"
+            else
+                echo ":$os_id"
+            fi
+        elif [ -f /etc/redhat-release ]; then
+            echo "rhel:rhel"
+        elif [ -f /etc/debian_version ]; then
+            echo "debian:debian"
+        else
+            exit 1
+        fi
+        ;;
+    *)
+        exit 1
+        ;;
+esac"#;
+    channel.exec(true, os_detect_command).await?;
+    let result = wait_result_from_channel(&mut channel).await?;
+    if result.exit_status != 0 {
+        return Err(anyhow!("Failed to detect OS type from /etc/os-release"));
+    }
+
+    let parts = result.output.trim().split(':').collect::<Vec<&str>>();
+    if parts.len() != 2 {
+        return Err(anyhow!("Failed to detect OS type from /etc/os-release"));
+    }
+    let (os_id_like, os_id) = (parts[0], parts[1]);
+
+    // check id_like and id
+    if os_id_like.contains("debian")
+        || matches!(
+            os_id,
+            "debian" | "ubuntu" | "kali" | "linuxmint" | "pop" | "raspbian"
+        )
+    {
+        return Ok(OsType::Debian);
+    } else if os_id_like.contains("rhel")
+        || os_id_like.contains("fedora")
+        || matches!(
+            os_id,
+            "rhel" | "centos" | "fedora" | "rocky" | "alma" | "ol" | "amzn"
+        )
+    {
+        return Ok(OsType::RedHat);
+    } else if os_id_like.contains("arch") || matches!(os_id, "arch" | "manjaro") {
+        return Ok(OsType::Arch);
+    }
+
+    Err(anyhow!(
+        "Unsupported OS type: ID={}, ID_LIKE={}",
+        os_id,
+        os_id_like
+    ))
 }
 
 pub async fn wait_result_from_channel(channel: &mut Channel<Msg>) -> Result<CommandResult> {

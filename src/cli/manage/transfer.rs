@@ -19,10 +19,10 @@ pub struct TransferAction {
     pub download: bool,
     /// Remote file path (required for upload/download)
     #[arg(long)]
-    pub remote_path: Option<String>,
+    pub remote: Option<String>,
     /// Local file path (required for upload/download)
     #[arg(long)]
-    pub local_path: Option<String>,
+    pub local: Option<String>,
     /// Force overwrite existing files
     #[arg(long)]
     pub force: bool,
@@ -37,18 +37,18 @@ pub struct TransferAction {
 impl TransferAction {
     pub fn local_execute(&self) -> Result<bool> {
         if self.upload {
-            if self.remote_path.is_none() {
-                return Err(anyhow!("--remote-path is required for upload"));
+            if self.remote.is_none() {
+                return Err(anyhow!("--remote is required for upload"));
             }
-            if self.local_path.is_none() {
-                return Err(anyhow!("--local-path is required for upload"));
+            if self.local.is_none() {
+                return Err(anyhow!("--local is required for upload"));
             }
         } else if self.download {
-            if self.remote_path.is_none() {
-                return Err(anyhow!("--remote-path is required for download"));
+            if self.remote.is_none() {
+                return Err(anyhow!("--remote is required for download"));
             }
-            if self.local_path.is_none() {
-                return Err(anyhow!("--local-path is required for download"));
+            if self.local.is_none() {
+                return Err(anyhow!("--local is required for download"));
             }
         } else {
             return Err(anyhow!(
@@ -74,6 +74,14 @@ impl TransferAction {
                 None
             } else {
                 let pb = Arc::new(progress.add(ProgressBar::new_spinner()));
+
+                // Set a nice style for the progress bar
+                let style = ProgressStyle::default_bar()
+                    .template("{msg} [{elapsed_precise}] {spinner:.green} [{bar:40.cyan/blue}] {percent:>3}% {bytes}/{total_bytes} ({bytes_per_sec}) ETA: {eta}")
+                    .unwrap()
+                    .progress_chars("#>-");
+                pb.set_style(style);
+
                 Some(pb)
             };
             handle_transfer_execute(pb, action, task, add_name, max_retry)
@@ -97,28 +105,28 @@ pub async fn handle_transfer_execute(
     };
 
     let result = if action.upload {
-        upload_file(
+        upload(
             pb,
             &task.srv_name,
             &task.ssh_client,
-            action.local_path.as_ref().unwrap(),
-            action.remote_path.as_ref().unwrap(),
+            action.local.as_ref().unwrap(),
+            action.remote.as_ref().unwrap(),
             transfer_config,
         )
         .await
     } else if action.download {
         // For download, append server name to avoid file conflicts
         let local_path = if add_name {
-            add_server_name(action.local_path.as_ref().unwrap(), &task.srv_name)
+            add_server_name(action.local.as_ref().unwrap(), &task.srv_name)
         } else {
-            action.local_path.as_ref().unwrap().clone()
+            action.local.as_ref().unwrap().clone()
         };
 
-        download_file(
+        download(
             pb,
             &task.srv_name,
             &task.ssh_client,
-            action.remote_path.as_ref().unwrap(),
+            action.remote.as_ref().unwrap(),
             &local_path,
             transfer_config,
         )
@@ -145,8 +153,8 @@ fn add_server_name(local_path: &str, server_name: &str) -> String {
     }
 }
 
-/// Upload file to server.
-pub async fn upload_file(
+/// Upload to server.
+pub async fn upload(
     pb: Option<Arc<ProgressBar>>,
     srv_name: &str,
     ssh_client: &Client,
@@ -165,34 +173,36 @@ pub async fn upload_file(
     let transfer_session = session.open_sftp_session(Some(config)).await?;
 
     log::info!(
-        "Uploading file '{}' to '{}' on server '{}'",
+        "Uploading '{}' to '{}' on server '{}({})'",
         local_path,
         remote_path,
-        srv_name
+        srv_name,
+        ssh_client,
     );
 
     let bytes_transferred = if let Some(ref pb) = pb {
         transfer_session
-            .upload_file_with_callback(local_path, remote_path, |progress| {
-                progress_callback(pb.clone(), srv_name, "📤", progress)
+            .upload_with_callback(local_path, remote_path, |progress| {
+                progress_callback(pb.clone(), srv_name, Operation::Upload, progress)
             })
             .await?
     } else {
-        transfer_session
-            .upload_file(local_path, remote_path)
-            .await?
+        transfer_session.upload(local_path, remote_path).await?
     };
 
     if let Some(ref pb) = pb {
         pb.finish_and_clear();
     }
-    println!("📤 Uploaded {} bytes", bytes_transferred);
+    println!(
+        "📤 Uploaded Success {} Bytes on server '{}({})'",
+        bytes_transferred, srv_name, ssh_client
+    );
 
     Ok(())
 }
 
 /// Download file from server.
-pub async fn download_file(
+pub async fn download(
     pb: Option<Arc<ProgressBar>>,
     srv_name: &str,
     ssh_client: &Client,
@@ -211,54 +221,74 @@ pub async fn download_file(
     let transfer_session = session.open_sftp_session(Some(config)).await?;
 
     log::info!(
-        "Downloading file '{}' from '{}' on server '{}'",
+        "Downloading '{}' from '{}' on server '{}({})'",
         local_path,
         remote_path,
-        srv_name
+        srv_name,
+        ssh_client
     );
 
     let bytes_transferred = if let Some(ref pb) = pb {
         transfer_session
-            .download_file_with_callback(remote_path, local_path, |progress| {
-                progress_callback(pb.clone(), srv_name, "📥", progress)
+            .download_with_callback(remote_path, local_path, |progress| {
+                progress_callback(pb.clone(), srv_name, Operation::Download, progress)
             })
             .await?
     } else {
-        transfer_session
-            .download_file(remote_path, local_path)
-            .await?
+        transfer_session.download(remote_path, local_path).await?
     };
 
     if let Some(ref pb) = pb {
         pb.finish_and_clear();
     }
-    println!("📥 Downloaded {} bytes", bytes_transferred);
+    println!(
+        "📥 Downloaded {} Bytes on server '{}({})'",
+        bytes_transferred, srv_name, ssh_client
+    );
 
     Ok(())
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Operation {
+    Upload,
+    Download,
 }
 
 /// Progress callback for transfer operations with server name
 fn progress_callback(
     pb: Arc<ProgressBar>,
     srv_name: &str,
-    operation: &str,
-    transfer_progress: TransferProgress,
+    operation: Operation,
+    transfer_progress: &TransferProgress,
 ) {
-    // Set the total length if not already set
-    if pb.length().is_none() {
-        pb.set_length(transfer_progress.total_bytes);
-
-        // Set a nice style for the progress bar
-        let style = ProgressStyle::default_bar()
-            .template("{msg} [{elapsed_precise}] {spinner:.green} [{bar:40.cyan/blue}] {percent:>3}% {bytes}/{total_bytes} ({bytes_per_sec}) ETA: {eta}")
-            .unwrap()
-            .progress_chars("#>-");
-        pb.set_style(style);
-    }
+    // always set total bytes
+    pb.set_length(transfer_progress.total_bytes);
 
     // Update the current position
     pb.set_position(transfer_progress.done_bytes);
 
-    // Set the message with server name, operation and speed
-    pb.set_message(format!("{} [{}]", operation, srv_name));
+    // Choose filename to display based on operation type
+    let display_name = match operation {
+        Operation::Upload => get_display_filename(&transfer_progress.local_path),
+        Operation::Download => get_display_filename(&transfer_progress.remote_path),
+    };
+
+    // Set the message with server name, operation and filename
+    pb.set_message(format!("📥 [{}] {}", srv_name, display_name));
+}
+
+/// Get display filename from path, truncating if too long
+fn get_display_filename(path: &str) -> String {
+    use std::path::Path;
+
+    let path = Path::new(&path);
+    let filename = path.file_name().unwrap_or_default().to_string_lossy();
+
+    // Truncate filename if too long
+    if filename.len() > 20 {
+        format!("{}...", &filename[..17])
+    } else {
+        filename.to_string()
+    }
 }

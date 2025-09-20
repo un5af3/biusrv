@@ -1,0 +1,88 @@
+# Main configuration file example (YAML format)
+# Used for server initialization and management
+
+manage:
+  server:
+    web1:
+      host: 192.168.1.100
+      port: 22
+      username: admin
+      keypath: ~/.ssh/id_rsa
+
+    web2:
+      host: 192.168.1.101
+      port: 22
+      username: admin
+      keypath: ~/.ssh/id_rsa
+
+    db:
+      host: 192.168.1.102
+      port: 22
+      username: admin
+      keypath: ~/.ssh/id_rsa
+
+init:
+  new_username: deploy
+  new_password: secure_password_123
+  packages:
+    - bash
+    - curl
+    - git
+    - vim
+    - htop
+  commands:
+    - timedatectl set-timezone Asia/Shanghai
+    - echo 'Welcome to server management' > /etc/motd
+
+  server:
+    web1:
+      host: 192.168.1.100
+      port: 22
+      username: root
+      password: initial_password
+
+    web2:
+      host: 192.168.1.101
+      port: 22
+      username: root
+      password: initial_password
+
+    db:
+      host: 192.168.1.102
+      port: 22
+      username: root
+      password: initial_password
+
+  sshd:
+    new_port: 2222
+    public_key: ssh-rsa AAAAB....== admin@example.com
+
+    options:
+      PubkeyAuthentication: yes
+      PermitRootLogin: no
+      PasswordAuthentication: no
+      PermitEmptyPasswords: no
+      MaxAuthTries: 5
+      ClientAliveInterval: 300
+      X11Forwarding: no
+
+  firewall:
+    policy: whitelist
+    enable_icmp: false
+    allow_ping: true
+    allow_ports:
+      - 2222/tcp
+      - 80/tcp
+      - 443/tcp
+      - 3306/tcp
+
+  fail2ban:
+    backend: systemd
+    jail:
+      sshd:
+        enabled: true
+        port: 2222
+        filter: sshd
+        maxretry: 3
+        findtime: 600
+        bantime: 3600

@@ -1,0 +1,41 @@
+info:
+  name: redis
+  desc: In-memory data structure store
+
+script:
+  install:
+    desc: Install and configure Redis
+    step:
+      - type: command
+        sudo: true
+        cmds:
+          - apt update
+          - apt install -y redis-server
+          - systemctl enable redis-server
+
+      - type: upload
+        local: ./configs/redis.conf
+        remote: /etc/redis/redis.conf
+        force: true
+
+      - type: command
+        sudo: true
+        cmds:
+          - chown redis:redis /etc/redis/redis.conf
+          - chmod 640 /etc/redis/redis.conf
+          - systemctl restart redis-server
+          - systemctl status redis-server
+
+  backup:
+    desc: Backup Redis data
+    step:
+      - type: command
+        sudo: true
+        cmds:
+          - redis-cli BGSAVE
+          - sleep 5
+
+      - type: download
+        local: ./backups/redis/
+        remote: /var/lib/redis/
+        resume: true

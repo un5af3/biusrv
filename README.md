@@ -7,9 +7,9 @@ A powerful Rust-based SSH server management tool for initializing, managing, and
 ### 🎯 Core Functionality
 
 - **Server Initialization**: Automate user creation, SSH configuration, firewall setup, and fail2ban installation
-- **Script Execution**: Execute predefined scripts for server setup and management
-- **Firewall Management**: Manage firewall rules with port allow/deny operations
-- **File Transfer**: Robust file upload/download with resume support and progress display
+- **Advanced Script System**: Execute complex deployment workflows with commands, file transfers, and multi-step operations
+- **Intelligent Firewall Management**: Manage firewall rules with whitelist/blacklist policies and OS-aware operations
+- **Robust File Transfer**: Smart file/directory upload/download with resume support and progress display
 - **Command Execution**: Execute commands on single or multiple servers concurrently
 - **Interactive Shell**: Connect to servers with interactive shell sessions
 
@@ -20,7 +20,19 @@ A powerful Rust-based SSH server management tool for initializing, managing, and
 - **Retry Mechanism**: Intelligent retry with exponential backoff
 - **Progress Display**: Beautiful progress bars for file transfers and operations
 - **Resume Support**: Resume interrupted file transfers
-- **Configuration-Driven**: TOML-based configuration for easy setup
+- **Dual Format Support**: Both TOML and YAML configuration formats
+- **Step-based Scripts**: Complex deployment workflows with multiple operation types
+- **OS-aware Operations**: Automatic detection and adaptation to different operating systems
+
+### 🔧 Script System
+
+The new script system supports three operation types:
+
+- **Command**: Execute shell commands with optional sudo privileges
+- **Upload**: Transfer files and directories from local to remote
+- **Download**: Transfer files and directories from remote to local
+
+Each script can contain multiple steps, allowing for complex deployment workflows.
 
 ## 📦 Installation
 
@@ -47,104 +59,89 @@ cargo install --path .
 
 ### 1. Configuration
 
-Create a `config.toml` file:
+Create a `config.toml` or `config.yaml` file:
+
+#### TOML Format
 
 ```toml
-# ===========================================
-# Server Management Configuration
-# ===========================================
-
 [manage.server.pi]
 host = "192.168.1.100"
-port = 22                    # Optional, defaults to 22
-username = "root"
-keypath = "/home/user/.ssh/id_rsa"    # Optional, for key-based auth
-password = "your-password"   # Optional, for password auth
-use_password = false         # Optional, defaults to false
-
-[manage.server.vps]
-host = "your-vps.com"
-port = 2222                  # Custom SSH port
-username = "admin"
-keypath = "/home/user/.ssh/vps_key"   # SSH key path
-# password = "secret"        # Uncomment for password auth
-# use_password = true        # Uncomment to enable password auth
-
-[manage.server.production]
-host = "prod.example.com"
-username = "deploy"
-keypath = "/home/user/.ssh/prod_key"
 port = 22
-
-# ===========================================
-# Server Initialization Configuration
-# ===========================================
+username = "root"
+keypath = "/home/user/.ssh/id_rsa"
 
 [init]
-# User creation settings
-new_username = "admin"       # Username to create
-new_password = "secure123"   # Password for new user
-packages = ["bash", "curl", "git", "vim", "htop"]  # Packages to install
-commands = [                 # Custom commands to run
-    "echo 'Welcome to the server!' > /etc/motd",
-    "timedatectl set-timezone Asia/Shanghai"
-]
+new_username = "admin"
+new_password = "secure123"
+packages = ["bash", "curl", "git", "vim"]
+commands = ["timedatectl set-timezone Asia/Shanghai"]
 
-# Target server for initialization
 [init.server.target_server]
-host = "192.168.1.100"       # Server to initialize
-port = 22                     # SSH port (default: 22)
-username = "root"             # SSH username
-password = "initial-password" # Initial password for root
-# keypath = "/home/user/.ssh/id_rsa"   # Optional: SSH key path
+host = "192.168.1.100"
+port = 22
+username = "root"
+password = "initial-password"
 
-# SSH server configuration
 [init.sshd]
-new_port = 2222              # Optional, change SSH port
-public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC... your-public-key"
+new_port = 2222
+public_key = "ssh-rsa your-public-key"
 
-[init.sshd.options]
-PubkeyAuthentication = "yes"
-PermitRootLogin = "no"
-PasswordAuthentication = "no"
-PermitEmptyPasswords = "no"
-MaxAuthTries = "5"
-ClientAliveInterval = "300"
-X11Forwarding = "no"
-
-# Firewall configuration
 [init.firewall]
-allow_ports = ["2222/tcp", "80/tcp", "443/tcp", "3306/tcp"]
-deny_ports = ["22/tcp"]      # Block default SSH port
+policy = "whitelist"
+enable_icmp = false
+allow_ping = true
+allow_ports = ["2222/tcp", "80/tcp", "443/tcp"]
+```
 
-# Fail2ban configuration
-[init.fail2ban]
-backend = "systemd"          # or "auto"
+#### YAML Format
 
-[init.fail2ban.jail.sshd]
-enabled = true
-port = "2222"                # SSH port to protect
-filter = "sshd"
-maxretry = 3                 # Max failed attempts
-findtime = 600               # Time window (seconds)
-bantime = 3600               # Ban duration (seconds)
+```yaml
+manage:
+  server:
+    pi:
+      host: 192.168.1.100
+      port: 22
+      username: root
+      keypath: /home/user/.ssh/id_rsa
 
-# ===========================================
-# Component Configuration (Optional)
-# ===========================================
+init:
+  new_username: admin
+  new_password: secure123
+  packages: [bash, curl, git, vim]
+  commands: [timedatectl set-timezone Asia/Shanghai]
 
-# Components are defined in separate TOML files in components/ directory
-# Example: components/docker.toml, components/nodejs.toml, etc.
+  server:
+    target_server:
+      host: 192.168.1.100
+      port: 22
+      username: root
+      password: initial-password
+
+  sshd:
+    new_port: 2222
+    public_key: ssh-rsa your-public-key
+
+  firewall:
+    policy: whitelist
+    enable_icmp: false
+    allow_ping: true
+    allow_ports: [2222/tcp, 80/tcp, 443/tcp]
 ```
 
 ### 2. Initialize Server
 
 ```bash
 # Initialize a new server
-biusrv init --server 192.168.1.100
+biusrv init --server target_server
 
-# Initialize with custom settings
-biusrv init --server 192.168.1.100 --users admin,deploy --ssh-port 2222
+# Initialize multiple servers
+biusrv init --server server1,server2
+
+# Initialize all configured servers
+biusrv init --all-servers
+
+# List available servers for initialization
+biusrv init --list-servers
 ```
 
 ### 3. Manage Servers
@@ -157,67 +154,143 @@ biusrv manage --list-servers
 biusrv manage --server pi,vps exec "systemctl status nginx"
 
 # Execute scripts
-biusrv manage --server pi,vps script --action install,configure scripts/docker.toml
+biusrv manage --server pi script run scripts/docker.yaml --action uninstall,install
 
-# Transfer files
-biusrv manage --server pi transfer --upload ./app.tar.gz /opt/app.tar.gz
+# Transfer files and directories
+biusrv manage --server pi transfer --upload --local ./app/ --remote /opt/app/
+biusrv manage --server pi transfer --download --remote /var/log/ --local ./logs/
+
+# Transfer single file to specific path
+biusrv manage --server pi transfer --upload --local ./config.conf --remote /etc/app/config.conf
+
+# Transfer with resume support
+biusrv manage --server pi transfer --upload --local ./large-file.zip --remote /tmp/large-file.zip --resume
+
+# Force overwrite existing files
+biusrv manage --server pi transfer --upload --local ./config.conf --remote /etc/app/config.conf --force
 
 # Interactive shell
-biusrv manage --server pi exec bash --shell
+biusrv manage --server pi exec --shell bash
 ```
 
 ## 📖 Usage Examples
 
-### Server Management
+### Script Management
+
+#### TOML Script Format
+
+```toml
+[info]
+name = "nginx"
+desc = "Web server and reverse proxy"
+
+[script.install]
+desc = "Install and configure nginx"
+
+[[script.install.step]]
+type = "command"
+sudo = true
+cmds = [
+    "apt update",
+    "apt install -y nginx",
+    "systemctl enable nginx"
+]
+
+[[script.install.step]]
+type = "upload"
+local = "./configs/nginx.conf"
+remote = "/etc/nginx/nginx.conf"
+force = true
+
+[[script.install.step]]
+type = "command"
+sudo = true
+cmds = [
+    "systemctl start nginx"
+]
+```
+
+#### YAML Script Format
+
+```yaml
+info:
+  name: nginx
+  desc: Web server and reverse proxy
+
+script:
+  install:
+    desc: Install and configure nginx
+    step:
+      - type: command
+        sudo: true
+        cmds:
+          - apt update
+          - apt install -y nginx
+          - systemctl enable nginx
+
+      - type: upload
+        local: ./configs/nginx.conf
+        remote: /etc/nginx/nginx.conf
+        force: true
+
+      - type: command
+        sudo: true
+        cmds:
+          - systemctl start nginx
+```
+
+### Script Execution
 
 ```bash
-# Execute scripts on all servers
-biusrv manage --all-servers script --action install,configure scripts/nginx.toml
+# Execute specific script actions
+biusrv manage --server pi script run scripts/nginx.yaml --action install
 
-# Manage specific servers
-biusrv manage --server web1,web2,db1 firewall --allow-port 3306,5432
+# Execute multiple actions
+biusrv manage --server pi script run scripts/nginx.yaml --action install,configure
 
-# Execute with sudo
-biusrv manage --server pi exec "systemctl restart nginx" --sudo
-
-# Hide command output
-biusrv manage --server pi exec "rm /tmp/old.log" --hide-output
+# List available actions in a script
+biusrv manage script list scripts/nginx.yaml
 ```
 
 ### File Transfer
 
-```bash
-# Upload with progress
-biusrv manage --server pi transfer --upload ./backup.tar.gz /backup/
+**Path Rules:**
 
-# Download with resume
-biusrv manage --server pi transfer --download /var/log/app.log ./logs/
-
-# Force overwrite
-biusrv manage --server pi transfer --upload ./config.conf /etc/app/ --force
-
-# Hide progress
-biusrv manage --server pi transfer --upload ./large-file.zip /tmp/ --hide-progress
-```
-
-### Script Management
+- **File to File**: Specify complete file paths for both local and remote
+- **Directory to Directory**: Specify directory paths for both local and remote
+- **Mixed transfers are not supported**: Cannot upload a file to a directory path
 
 ```bash
-# List available scripts
-biusrv manage script list scripts/docker.toml
+# Upload single file to specific path
+biusrv manage --server pi transfer --upload --local ./backup.tar.gz --remote /backup/backup.tar.gz
+biusrv manage --server pi transfer --upload --local ./config.conf --remote /etc/app/config.conf
 
-# Execute specific script actions
-biusrv manage --server pi script --action install,configure scripts/nginx.toml
+# Upload directory to directory
+biusrv manage --server pi transfer --upload --local ./app/ --remote /opt/app/
 
-# Execute all actions in a script
-biusrv manage --server pi script --action install,configure,ssl-setup scripts/nginx.toml
+# Download single file to specific path
+biusrv manage --server pi transfer --download --remote /var/log/app.log --local ./logs/app.log --resume
+biusrv manage --server pi transfer --download --remote /etc/nginx/nginx.conf --local ./configs/nginx.conf
+
+# Download directory to directory
+biusrv manage --server pi transfer --download --remote /var/log/ --local ./logs/
+
+# Force overwrite existing files
+biusrv manage --server pi transfer --upload --local ./config.conf --remote /etc/app/config.conf --force
+
+# Resume interrupted transfers
+biusrv manage --server pi transfer --upload --local ./large-file.zip --remote /tmp/large-file.zip --resume
+
+# Hide progress display
+biusrv manage --server pi transfer --upload --local ./large-file.zip --remote /tmp/large-file.zip --hide-progress
+
 ```
 
 ### Firewall Management
 
 ```bash
 # Show firewall status
-biusrv manage --server pi firewall --status-port
+biusrv manage --server pi firewall --status
 
 # Allow ports
 biusrv manage --server pi firewall --allow-port 80,443,8080
@@ -225,8 +298,14 @@ biusrv manage --server pi firewall --allow-port 80,443,8080
 # Deny ports
 biusrv manage --server pi firewall --deny-port 23,135,445
 
-# Delete rules
+# Delete allowed ports
 biusrv manage --server pi firewall --delete-allow-port 8080
+
+# Delete denied ports
+biusrv manage --server pi firewall --delete-deny-port 23
+
+# Save firewall rules permanently
+biusrv manage --server pi firewall --allow-port 80,443 --save
 ```
 
 ## ⚙️ Configuration
@@ -268,7 +347,6 @@ host = "192.168.1.100"          # Server to initialize
 port = 22                        # SSH port (default: 22)
 username = "root"                # SSH username
 password = "initial-password"    # Initial password for root
-# keypath = "/home/user/.ssh/id_rsa"      # Optional: SSH key path
 
 # SSH server configuration
 [init.sshd]
@@ -286,8 +364,10 @@ X11Forwarding = "no"             # Disable X11 forwarding
 
 # Firewall configuration
 [init.firewall]
+policy = "whitelist"             # Firewall policy: "whitelist" or "blacklist"
+enable_icmp = false              # Enable ICMP protocol
+allow_ping = true                # Allow ping (only used when enable_icmp is false)
 allow_ports = ["2222/tcp", "80/tcp", "443/tcp"]  # Ports to allow
-deny_ports = ["22/tcp"]          # Ports to deny
 
 # Fail2ban configuration
 [init.fail2ban]
@@ -304,46 +384,52 @@ bantime = 3600                   # Ban duration (seconds)
 
 ### Script Configuration
 
-Scripts are defined in TOML files in the `scripts/` directory:
+Scripts support three operation types:
 
-```toml
-# scripts/docker.toml
-[info]
-name = "docker"
-desc = "Docker container runtime"
+#### Command Operations
 
-[script.install]
-desc = "Install Docker"
-sudo = true
-commands = [
-    "apt update",
-    "apt install -y docker.io",
-    "systemctl enable docker",
-    "systemctl start docker"
-]
+```yaml
+- type: command
+  sudo: true # Optional, defaults to false
+  cmds:
+    - apt update
+    - apt install -y nginx
+```
 
-[script.uninstall]
-desc = "Uninstall Docker"
-sudo = true
-commands = [
-    "systemctl stop docker",
-    "apt remove -y docker.io",
-    "rm -rf /var/lib/docker"
-]
+#### Upload Operations
+
+```yaml
+- type: upload
+  local: ./configs/nginx.conf
+  remote: /etc/nginx/nginx.conf
+  force: true # Optional, defaults to false
+  resume: false # Optional, defaults to false
+  max_retry: 3 # Optional, defaults to 0
+```
+
+#### Download Operations
+
+```yaml
+- type: download
+  local: ./backups/
+  remote: /var/log/nginx/
+  force: false # Optional, defaults to false
+  resume: true # Optional, defaults to false
+  max_retry: 2 # Optional, defaults to 0
 ```
 
 ## 📚 Example Scripts
 
-The project includes comprehensive example scripts in the `example-scrpts/` directory:
+The project includes comprehensive example scripts in the `examples/scripts/` directory:
 
-- **`nginx.toml`** - Nginx web server installation and configuration
-- **`nodejs.toml`** - Node.js runtime environment setup
-- **`redis.toml`** - Redis in-memory data store setup
-- **`monitoring.toml`** - System monitoring tools installation
-- **`security.toml`** - Security hardening and tools setup
-- **`backup.toml`** - Backup and restore utilities
+- **`nginx.toml/yaml`** - Nginx web server installation and configuration
+- **`mysql.toml/yaml`** - MySQL database server setup
+- **`nodejs.yaml`** - Node.js runtime environment and application deployment
+- **`redis.yaml`** - Redis in-memory data store setup
+- **`monitoring.yaml`** - Prometheus and Grafana monitoring system
+- **`docker.toml/yaml`** - Docker container runtime installation
 
-Each script includes multiple actions (install, configure, uninstall, etc.) and demonstrates best practices for server management automation.
+Each script includes multiple actions (install, configure, uninstall, backup) and demonstrates best practices for server management automation.
 
 ## 🔧 Command Reference
 
@@ -351,19 +437,20 @@ Each script includes multiple actions (install, configure, uninstall, etc.) and 
 
 - `--config <FILE>`: Configuration file path (default: config.toml)
 - `--log-level <LEVEL>`: Log level (trace, debug, info, warn, error)
-- `--comp-dir <DIR>`: Component directory path (default: components)
 
 ### Init Command
 
 ```bash
-biusrv init [OPTIONS] --server <SERVER>
+biusrv init [OPTIONS]
 ```
 
 Options:
 
-- `--users <USERS>`: Comma-separated list of users to create
-- `--ssh-port <PORT>`: SSH port to configure
-- `--firewall-ports <PORTS>`: Comma-separated list of ports to allow
+- `--list-servers`: List all configured servers for initialization
+- `--all-servers`: Initialize all configured servers
+- `--server <SERVERS>`: Comma-separated list of server names to initialize
+- `--threads <NUM>`: Number of threads for parallel initialization
+- `--max-retry <NUM>`: Maximum retry attempts (default: 0)
 
 ### Manage Command
 
@@ -388,7 +475,7 @@ biusrv manage script [OPTIONS]
 ```
 
 - `list <SCRIPT_FILE>`: List available actions in a script
-- `run <SCRIPT_FILE> --action <ACTIONS>`: Execute specific actions from a script
+- `run <SCRIPT_FILE> --action <ACTIONS>`: Execute specific actions from a script (comma-separated)
 
 **Command Execution:**
 
@@ -406,11 +493,12 @@ biusrv manage exec <COMMAND> [OPTIONS]
 biusrv manage firewall [OPTIONS]
 ```
 
-- `--status-port`: Show firewall status and port information
-- `--allow-port <PORTS>`: Allow ports
-- `--deny-port <PORTS>`: Deny ports
-- `--delete-allow-port <PORTS>`: Delete allowed ports
-- `--delete-deny-port <PORTS>`: Delete denied ports
+- `--status`: Show firewall status and port information
+- `--allow-port <PORTS>`: Allow ports (comma-separated)
+- `--deny-port <PORTS>`: Deny ports (comma-separated)
+- `--delete-allow-port <PORTS>`: Delete allowed ports (comma-separated)
+- `--delete-deny-port <PORTS>`: Delete denied ports (comma-separated)
+- `--save`: Save firewall rules permanently
 
 **File Transfer:**
 
@@ -418,39 +506,13 @@ biusrv manage firewall [OPTIONS]
 biusrv manage transfer [OPTIONS]
 ```
 
-- `--upload <LOCAL> <REMOTE>`: Upload file to remote server
-- `--download <REMOTE> <LOCAL>`: Download file from remote server
+- `--upload`: Upload local file to remote server
+- `--download`: Download remote file to local
+- `--local <PATH>`: Local file path (required for upload/download)
+- `--remote <PATH>`: Remote file path (required for upload/download)
 - `--force`: Force overwrite existing files
 - `--resume`: Resume interrupted transfers
-- `--hide-progress`: Hide transfer progress
-
-## 🏗️ Architecture
-
-### Project Structure
-
-```
-src/
-├── cli/                    # CLI interface
-│   ├── manage/            # Management subcommands
-│   │   ├── script.rs      # Script execution
-│   │   ├── exec.rs        # Command execution & shell
-│   │   ├── firewall.rs    # Firewall management
-│   │   └── transfer.rs    # File transfer
-│   ├── executor.rs        # Parallel task execution
-│   └── multishell.rs      # Multi-server shell sessions
-├── config.rs              # Configuration handling
-├── script.rs              # Script management
-├── ssh.rs                 # SSH client implementation
-├── transfer.rs            # File transfer core
-└── lib.rs                 # Library exports
-```
-
-### Key Design Patterns
-
-- **Unified Execution Model**: All commands follow `local_execute`/`remote_execute` pattern
-- **Concurrent Task Execution**: Built-in parallel execution framework
-- **Retry Mechanism**: Exponential backoff with configurable retry counts
-- **Progress Display**: Real-time progress bars for long-running operations
+- `--hide-progress`: Hide transfer progress display
 
 ## 🤝 Contributing
 
@@ -470,6 +532,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - SSH functionality powered by [russh](https://github.com/warp-tech/russh)
 - CLI interface built with [clap](https://github.com/clap-rs/clap)
 - Progress bars by [indicatif](https://github.com/console-rs/indicatif)
+- YAML support by [serde_yaml](https://github.com/dtolnay/serde-yaml)
 
 ## 📞 Support
 
