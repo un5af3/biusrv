@@ -458,7 +458,16 @@ impl TransferSession {
                 let local_file = replace_to_local_path(remote_file, local_dir, remote_dir);
                 let link_to = self.session.read_link(remote_file).await?;
                 let link_to = replace_to_local_path(&link_to, local_dir, remote_dir);
-                tokio::fs::symlink_file(link_to, local_file).await?;
+
+                // Cross-platform symlink creation
+                #[cfg(target_os = "windows")]
+                {
+                    tokio::fs::symlink_file(link_to, local_file).await?;
+                }
+                #[cfg(not(target_os = "windows"))]
+                {
+                    tokio::fs::symlink(link_to, local_file).await?;
+                }
             }
         }
 
